@@ -8,6 +8,7 @@ use std::time::Duration;
 struct Args {
     /// Path to directory
     #[arg(
+        // https://stackoverflow.com/questions/76341332/clap-default-value-for-pathbuf
         default_value = std::env::current_dir().expect("Can't get current directory path").into_os_string(),
         value_hint = clap::ValueHint::DirPath
     )]
