@@ -129,14 +129,22 @@ mod test {
         }
         create_dir_all(&temp_dir)?;
 
+        assert_eq!(size(&temp_dir)?, 0);
+
         let mut file = File::create(temp_dir.join("file"))?;
         write!(file, "test"); // 4 bytes
+
+        assert_eq!(size(&temp_dir)?, 4);
 
         let dir_path = temp_dir.join("dir");
         create_dir_all(&dir_path)?;
 
+        assert_eq!(size(&temp_dir)?, 4);
+
         let mut file = File::create(&dir_path.join("other_file"))?;
         write!(file, "testing test"); // 12 bytes
+
+        assert_eq!(size(&temp_dir)?, 4 + (12));
 
         let mut file = File::create(&dir_path.join("and_another_file"))?;
         write!(file, "testing test of tests"); // 21 bytes
