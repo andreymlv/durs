@@ -4,11 +4,19 @@ use std::{fs::DirEntry, path::PathBuf};
 pub fn ls<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<PathBuf>> {
     let mut entries = Vec::new();
     for entry in path.as_ref().read_dir()? {
+        entries.push(entry?.path());
+    }
+    Ok(entries)
+}
+
+pub fn ls_rec<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<PathBuf>> {
+    let mut entries = Vec::new();
+    for entry in path.as_ref().read_dir()? {
         let entry = entry?;
         let entry_meta = entry.metadata()?;
         entries.push(entry.path());
         if entry_meta.is_dir() {
-            entries.append(&mut ls(entry.path())?);
+            entries.append(&mut ls_rec(entry.path())?);
         }
     }
     Ok(entries)
@@ -82,6 +90,31 @@ mod test {
         let _ = File::create(&file_path_from_dir)?;
 
         let mut actual = ls(&temp_dir)?;
+        actual.sort();
+        let mut expected = vec![file_path, dir_path];
+        expected.sort();
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ls_rec() -> anyhow::Result<()> {
+        let temp_dir = std::env::temp_dir().join("durs_test_ls_rec");
+        if temp_dir.exists() {
+            remove_dir_all(&temp_dir)?;
+        }
+        create_dir_all(&temp_dir)?;
+
+        let file_path = temp_dir.join("file");
+        let _ = File::create(&file_path)?;
+
+        let dir_path = temp_dir.join("dir");
+        create_dir_all(&dir_path)?;
+        let file_path_from_dir = dir_path.join("file");
+        let _ = File::create(&file_path_from_dir)?;
+
+        let mut actual = ls_rec(&temp_dir)?;
         actual.sort();
         let mut expected = vec![file_path, dir_path, file_path_from_dir];
         expected.sort();
