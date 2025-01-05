@@ -2,22 +2,32 @@ use std::path::Path;
 use std::{fs::DirEntry, path::PathBuf};
 
 pub fn ls<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<PathBuf>> {
+    let meta = path.as_ref().symlink_metadata()?;
     let mut entries = Vec::new();
-    for entry in path.as_ref().read_dir()? {
-        entries.push(entry?.path());
+    if meta.is_dir() {
+        for entry in path.as_ref().read_dir()? {
+            entries.push(entry?.path());
+        }
+    } else {
+        entries.push(path.as_ref().to_path_buf());
     }
     Ok(entries)
 }
 
 pub fn ls_rec<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<PathBuf>> {
+    let meta = path.as_ref().symlink_metadata()?;
     let mut entries = Vec::new();
-    for entry in path.as_ref().read_dir()? {
-        let entry = entry?;
-        let entry_meta = entry.metadata()?;
-        entries.push(entry.path());
-        if entry_meta.is_dir() {
-            entries.append(&mut ls_rec(entry.path())?);
+    if meta.is_dir() {
+        for entry in path.as_ref().read_dir()? {
+            let entry = entry?;
+            let entry_meta = entry.metadata()?;
+            entries.push(entry.path());
+            if entry_meta.is_dir() {
+                entries.append(&mut ls_rec(entry.path())?);
+            }
         }
+    } else {
+        entries.push(path.as_ref().to_path_buf());
     }
     Ok(entries)
 }
@@ -44,7 +54,7 @@ pub fn size<P: AsRef<Path>>(path: P) -> anyhow::Result<u64> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fs::{File, create_dir_all, remove_dir_all};
+    use std::fs::{create_dir_all, remove_dir_all, File};
     use std::io::Write;
     use std::path::Path;
 
@@ -74,8 +84,8 @@ mod test {
     }
 
     #[test]
-    fn test_ls() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("durs_test_ls");
+    fn test_ls_dir() -> anyhow::Result<()> {
+        let temp_dir = std::env::temp_dir().join("durs_test_ls_dir");
         if temp_dir.exists() {
             remove_dir_all(&temp_dir)?;
         }
@@ -99,8 +109,26 @@ mod test {
     }
 
     #[test]
-    fn test_ls_rec() -> anyhow::Result<()> {
-        let temp_dir = std::env::temp_dir().join("durs_test_ls_rec");
+    fn test_ls_file() -> anyhow::Result<()> {
+        let temp_dir = std::env::temp_dir().join("durs_test_ls_file");
+        if temp_dir.exists() {
+            remove_dir_all(&temp_dir)?;
+        }
+        create_dir_all(&temp_dir)?;
+
+        let file_path = temp_dir.join("file");
+        let _ = File::create(&file_path)?;
+
+        let mut actual = ls(&file_path)?;
+        let mut expected = vec![file_path];
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ls_rec_dir() -> anyhow::Result<()> {
+        let temp_dir = std::env::temp_dir().join("durs_test_ls_rec_dir");
         if temp_dir.exists() {
             remove_dir_all(&temp_dir)?;
         }
@@ -118,6 +146,25 @@ mod test {
         actual.sort();
         let mut expected = vec![file_path, dir_path, file_path_from_dir];
         expected.sort();
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_ls_rec_file() -> anyhow::Result<()> {
+        let temp_dir = std::env::temp_dir().join("durs_test_ls_rec_file");
+        if temp_dir.exists() {
+            remove_dir_all(&temp_dir)?;
+        }
+        create_dir_all(&temp_dir)?;
+
+        let file_path = temp_dir.join("file");
+        let _ = File::create(&file_path)?;
+
+        let mut actual = ls_rec(&file_path)?;
+        let mut expected = vec![file_path];
         assert_eq!(actual, expected);
 
         Ok(())
